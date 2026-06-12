@@ -20,14 +20,14 @@ COULEUR_TERMINE = "#FFD700"
 RANGS = [
     {"min": 600, "nom_prefixe": "(11) 👑 ", "mot": "LÉGENDE", "couleur": "#E2583E", "couleur_shine": "#FF8A75", "cycle_shine": 20000, "son": "level_legende.mp3", "duree_son": 13000, "gif_rang": "gif_legende.gif"}, 
     {"min": 470, "nom_prefixe": "(10) 🌟 ", "mot": "CHAMPION", "couleur": "#A335EE", "couleur_shine": "#D996FF", "cycle_shine": 30000, "son": "level_champion.mp3", "duree_son": 13000, "gif_rang": "gif_champion.gif"}, 
-    {"min": 360, "nom_prefixe": "(9) 🔥 ", "mot": "HÉROS", "couleur": "#FF8000", "couleur_shine": "#FFAE59", "cycle_shine": 40000, "son": "level_heros.mp3", "duree_son": 8000, "gif_rang": "gif_heros.gif"},       
-    {"min": 260, "nom_prefixe": "(8) 🔱 ", "mot": "PALADIN", "couleur": "#0070DD", "couleur_shine": "#66B2FF", "cycle_shine": 50000, "son": "level_paladin.mp3", "duree_son": 6000, "gif_rang": "gif_paladin.gif"},     
+    {"min": 360, "nom_prefixe": "(9) 🔥 ", "mot": "HÉROS", "couleur": "#FF8000", "couleur_shine": "#FFAE59", "cycle_shine": 40000, "son": "level_heros.mp3", "duree_son": 10000, "gif_rang": "gif_heros.gif"},       
+    {"min": 260, "nom_prefixe": "(8) 🔱 ", "mot": "PALADIN", "couleur": "#0070DD", "couleur_shine": "#66B2FF", "cycle_shine": 50000, "son": "level_paladin.mp3", "duree_son": 10000, "gif_rang": "gif_paladin.gif"},     
     {"min": 180, "nom_prefixe": "(7) ⚔️ ", "mot": "CHEVALIER", "couleur": "#1EFF00", "couleur_shine": "#A3FF94", "cycle_shine": 60000, "son": "level_chevalier.mp3", "duree_son": 8000, "gif_rang": "gif_chevalier.gif"}, 
-    {"min": 120, "nom_prefixe": "(6) 🛡️ DÉFENSEUR", "couleur": "#00FFDD", "son": "level_defenseur.mp3", "duree_son": 6000, "gif_rang": "gif_defenseur.gif"},
+    {"min": 120, "nom_prefixe": "(6) 🛡️ DÉFENSEUR", "couleur": "#00FFDD", "son": "level_defenseur.mp3", "duree_son": 8000, "gif_rang": "gif_defenseur.gif"},
     {"min": 75,  "nom_prefixe": "(5) 🏟️ GLADIATEUR", "couleur": "#FFFF00", "son": "level_gladiateur.mp3", "duree_son": 8000, "gif_rang": "gif_gladiateur.gif"},
-    {"min": 45,  "nom_prefixe": "(4) 💰 MERCENAIRE", "couleur": "#B0B0B0", "son": "level_mercenaire.mp3", "duree_son": 1500, "gif_rang": "gif_mercenaire.gif"},
-    {"min": 25,  "nom_prefixe": "(3) 👁️ GARDIEN", "couleur": "#714321", "son": "level_gardien.mp3", "duree_son": 2000, "gif_rang": "gif_gardien.gif"},
-    {"min": 10,  "nom_prefixe": "(2) 🎒 AVENTURIER", "couleur": "#FFFFFF", "son": "level_aventurier.mp3", "duree_son": 1500, "gif_rang": "gif_aventurier.gif"},
+    {"min": 45,  "nom_prefixe": "(4) 💰 MERCENAIRE", "couleur": "#B0B0B0", "son": "level_mercenaire.mp3", "duree_son": 5000, "gif_rang": "gif_mercenaire.gif"},
+    {"min": 25,  "nom_prefixe": "(3) 👁️ GARDIEN", "couleur": "#714321", "son": "level_gardien.mp3", "duree_son": 5000, "gif_rang": "gif_gardien.gif"},
+    {"min": 10,  "nom_prefixe": "(2) 🎒 AVENTURIER", "couleur": "#FFFFFF", "son": "level_aventurier.mp3", "duree_son": 5000, "gif_rang": "gif_aventurier.gif"},
     {"min": 0,   "nom_prefixe": "(1) 🌱 NOVICE", "couleur": "#90EE90", "son": None, "duree_son": 0, "gif_rang": None}
 ]
 
