@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import messagebox  # Import pour la boîte de message Windows
 import customtkinter as ctk
 from pygame import mixer
 import time
@@ -10,6 +11,7 @@ DOSSIER_SCRIPT = Path(__file__).parent.resolve()
 FICHIER_SAUVEGARDE = DOSSIER_SCRIPT / "temps_travail.txt"
 FICHIER_GIF_LEVELUP = DOSSIER_SCRIPT / "levelup.gif"
 TAILLE_POLICE_HUD = 14
+POLICE_PRINCIPALE = "Montserrat"
 
 # Couleurs du HUD (Statistiques)
 COULEUR_EN_COURS = "#008000"
@@ -61,7 +63,7 @@ class LifeRPGApp(ctk.CTk):
         self.overrideredirect(True) 
         largeur_ecran = self.winfo_screenwidth()
         largeur_widget = 320
-        hauteur_widget = 250  
+        hauteur_widget = 150  # Réduction de la hauteur car le menu de test a été supprimé
         pos_x = largeur_ecran - largeur_widget - 20
         pos_y = 20
         self.geometry(f"{largeur_widget}x{hauteur_widget}+{pos_x}+{pos_y}")
@@ -98,8 +100,6 @@ class LifeRPGApp(ctk.CTk):
         self.label_mot_brillant = None
         self.label_mot_apres = None
         self.label_barre = None 
-        
-        self.rang_selectionne_test = RANGS[4] # Par défaut sur Chevalier pour le test
         
         self.frames_levelup = []
         self.caches_gifs_rangs = {} 
@@ -231,31 +231,6 @@ class LifeRPGApp(ctk.CTk):
         self.animer_gifs_conjointement()
         self.after(max(500, rang_actuel["duree_son"] - 400), self.fade_out)
 
-    def forcer_test_levelup_instantane(self):
-        if self.status == "STOPPED":
-            self.status = "RUNNING"
-            self.gerer_hud()
-            self.status = "STOPPED"
-        else:
-            self.gerer_hud()
-            
-        if self.id_animation_shine: self.after_cancel(self.id_animation_shine)
-        
-        rang_test = self.rang_selectionne_test
-        self.rang_precedent = rang_test
-        
-        self.label_prefixe.config(text=rang_test["nom_prefixe"], fg=rang_test["couleur"])
-        self.label_mot_avant.config(text=rang_test.get("mot", ""), fg=rang_test["couleur"])
-        self.label_barre.config(text=" [■■■■■■■■■■] TEST ANIMATION", fg=rang_test["couleur"])
-        
-        self.jouer_son_et_declencher_double_gif(rang_test)
-
-    def selection_rang_test_via_menu(self, choix_nom):
-        for rang in RANGS:
-            if rang["nom_prefixe"] in choix_nom:
-                self.rang_selectionne_test = rang
-                break
-
     def gerer_hud(self):
         if self.status == "STOPPED" and not self.en_animation_levelup:
             if self.hud:
@@ -275,20 +250,20 @@ class LifeRPGApp(ctk.CTk):
             self.hud.wm_attributes("-transparentcolor", "black")
             self.hud.config(bg="black")
 
-            self.label_stats = tk.Label(self.hud, font=("Consolas", TAILLE_POLICE_HUD, "bold"), bg="black")
+            self.label_stats = tk.Label(self.hud, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD, "bold"), bg="black")
             self.label_stats.pack(anchor="w")
             self.frame_basse = tk.Frame(self.hud, bg="black")
             self.frame_basse.pack(anchor="w", pady=(2, 0))
             
-            self.label_prefixe = tk.Label(self.frame_basse, font=("Consolas", TAILLE_POLICE_HUD, "bold"), bg="black")
+            self.label_prefixe = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD, "bold"), bg="black")
             self.label_prefixe.pack(side="left")
-            self.label_mot_avant = tk.Label(self.frame_basse, font=("Consolas", TAILLE_POLICE_HUD, "bold"), bg="black")
+            self.label_mot_avant = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD, "bold"), bg="black")
             self.label_mot_avant.pack(side="left")
-            self.label_mot_brillant = tk.Label(self.frame_basse, font=("Consolas", TAILLE_POLICE_HUD, "bold"), bg="black")
+            self.label_mot_brillant = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD, "bold"), bg="black")
             self.label_mot_brillant.pack(side="left")
-            self.label_mot_apres = tk.Label(self.frame_basse, font=("Consolas", TAILLE_POLICE_HUD, "bold"), bg="black")
+            self.label_mot_apres = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD, "bold"), bg="black")
             self.label_mot_apres.pack(side="left")
-            self.label_barre = tk.Label(self.frame_basse, font=("Consolas", TAILLE_POLICE_HUD - 1, "bold"), bg="black")
+            self.label_barre = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD - 1, "bold"), bg="black")
             self.label_barre.pack(side="left")
             
             self.label_gif_levelup = tk.Label(self.hud, bg="black")
@@ -327,56 +302,23 @@ class LifeRPGApp(ctk.CTk):
             self.label_mot_avant.config(text="", fg=rang_actuel["couleur"])
 
     def setup_ui(self):
-        self.label_total = ctk.CTkLabel(self, text=self.generer_texte_total(), font=("Helvetica", 13, "bold"), text_color="#aaaaaa")
-        self.label_total.pack(pady=(5, 5))
+        self.label_total = ctk.CTkLabel(self, text=self.generer_texte_total(), font=(POLICE_PRINCIPALE, 13, "bold"), text_color="#aaaaaa")
+        self.label_total.pack(pady=(15, 5))
 
-        self.sound_option = ctk.CTkOptionMenu(self, values=["Pas d'alerte sonore", "Alerte après 25 min", "Alerte après 50 min", "Alerte Custom (1 min)"], command=self.change_sound_setting)
-        self.sound_option.pack(pady=2)
+        self.sound_option = ctk.CTkOptionMenu(self, font=(POLICE_PRINCIPALE, 12), dropdown_font=(POLICE_PRINCIPALE, 12), values=["Pas d'alerte sonore", "Alerte après 25 min", "Alerte après 50 min", "Alerte Custom (1 min)"], command=self.change_sound_setting)
+        self.sound_option.pack(pady=5)
 
         self.frame_boutons = ctk.CTkFrame(self, fg_color="transparent")
-        self.frame_boutons.pack(pady=5, fill="x", padx=20)
+        self.frame_boutons.pack(pady=10, fill="x", padx=20)
 
-        self.btn_action = ctk.CTkButton(self.frame_boutons, text="Lancer", fg_color="green", font=("Helvetica", 11, "bold"), command=self.action_clic)
+        self.btn_action = ctk.CTkButton(self.frame_boutons, text="Lancer", fg_color="green", font=(POLICE_PRINCIPALE, 11, "bold"), command=self.action_clic)
         self.btn_action.pack(side="left", expand=True, padx=5)
 
-        self.btn_stop = ctk.CTkButton(self.frame_boutons, text="Arrêter", fg_color="#4a4a4a", state="disabled", font=("Helvetica", 11, "bold"), command=self.stop_timer)
+        self.btn_stop = ctk.CTkButton(self.frame_boutons, text="Arrêter", fg_color="#4a4a4a", state="disabled", font=(POLICE_PRINCIPALE, 11, "bold"), command=self.stop_timer)
         self.btn_stop.pack(side="right", expand=True, padx=5)
 
-        # ----------------------------------------------------
-        # 🧪 SECTION DE DEBOGAGE ET TEST RAPIDE DES GIFS
-        # ----------------------------------------------------
-        self.separator = ctk.CTkFrame(self, height=2, fg_color="#333333")
-        self.separator.pack(fill="x", padx=15, pady=5)
-        
-        self.frame_test = ctk.CTkFrame(self, fg_color="#222222", corner_radius=6)
-        self.frame_test.pack(fill="x", padx=15, pady=2)
-        
-        liste_noms_rangs = [r["nom_prefixe"] + r.get("mot", "") for r in RANGS[:-1]] 
-        
-        self.test_option = ctk.CTkOptionMenu(
-            self.frame_test, 
-            values=liste_noms_rangs, 
-            height=22,
-            font=("Helvetica", 10),
-            command=self.selection_rang_test_via_menu
-        )
-        self.test_option.pack(pady=3, padx=10, fill="x")
-        self.test_option.set("(7) ⚔️ CHEVALIER")  # Correction ici : Utilisation de .set() au lieu de initial_value
-        
-        self.btn_test_trigger = ctk.CTkButton(
-            self.frame_test, 
-            text="⚡ Déclencher Level Up (Test)", 
-            fg_color="#5c24b3", 
-            hover_color="#7b3fd3",
-            height=22,
-            font=("Helvetica", 10, "bold"), 
-            command=self.forcer_test_levelup_instantane
-        )
-        self.btn_test_trigger.pack(pady=(0, 4), padx=10, fill="x")
-        # ----------------------------------------------------
-
-        self.btn_close = ctk.CTkButton(self, text="× Quitter l'application", fg_color="transparent", text_color="gray", hover_color="#2b2b2b", height=15, font=("Helvetica", 10), command=self.quit)
-        self.btn_close.pack(side="bottom", pady=2)
+        self.btn_close = ctk.CTkButton(self, text="× Quitter l'application", fg_color="transparent", text_color="gray", hover_color="#2b2b2b", height=15, font=(POLICE_PRINCIPALE, 10), command=self.quit)
+        self.btn_close.pack(side="bottom", pady=5)
 
     def generer_texte_total(self):
         h_jour, m_jour = divmod(self.jour_minutes, 60)
@@ -413,8 +355,12 @@ class LifeRPGApp(ctk.CTk):
                 self.label_total.configure(text=self.generer_texte_total())
                 self.gerer_hud()
                 if self.sound_limit_minutes > 0 and self.session_minutes >= self.sound_limit_minutes:
-                    self.status = "FINISHED"; self.play_alert_sound()
-                    self.btn_action.configure(text="Relancer", fg_color="green"); self.gerer_hud()
+                    self.status = "FINISHED"
+                    self.btn_action.configure(text="Relancer", fg_color="green")
+                    self.gerer_hud()
+                    self.play_alert_sound()
+                    # Déclenchement de la pop-up d'information Windows
+                    messagebox.showinfo("Session Terminée", f"Félicitations ! Votre session de {self.sound_limit_minutes} min est terminée.")
                     return
             self.after(1000, self.update_timer)
 
