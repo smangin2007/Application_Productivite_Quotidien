@@ -1,113 +1,160 @@
 import os
 import sys
+import time
+import subprocess
+import psutil
 from datetime import datetime
-from PyQt6.QtCore import QUrl, QTimer, Qt
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget
-from PyQt6.QtWebEngineCore import QWebEngineProfile
-from PyQt6.QtWebEngineWidgets import QWebEngineView
+import tkinter as tk
+from tkinter import messagebox
 
 # --- CONFIGURATION ---
-URL_DEPART = "https://www.youtube.com"
+FONT_FAMILY = "Montserrat"
+FONT_SIZE = 14
+COLOR_BLUE = "#1A365D"       # Bleu foncé
+COLOR_RED = "#E53E3E"        # Rouge clair
+ALERT_MINUTES = 50           # Seuil pour la pause
 
-# Fichier de sauvegarde pour le divertissement web (séparé de Playnite)
-LOG_FILE_WEB = os.path.join(os.path.expanduser("~"), "web_entertainment_timer.txt")
+# Cible du divertissement (Modifie l'URL selon tes besoins)
+TARGET_URL = "https://www.youtube.com"
+CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
 
-# Dossier où seront stockés tes cookies, ton cache et tes connexions (Persistance)
-PROFILE_DIR = os.path.join(os.path.expanduser("~"), "AppData", "Local", "MonEspaceDivertissement", "MoteurWeb")
+# Fichier de log pour le divertissement (séparé du fichier de jeu !)
+LOG_FILE = os.path.join(os.path.expanduser("~"), "divertissement_daily_timer.txt")
 
-class DivertissementApp(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Espace Divertissement Web")
+def get_total_minutes_today():
+    """Récupère le temps total de divertissement déjà accumulé aujourd'hui."""
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, "r") as f:
+            lines = f.readlines()
+            if lines:
+                try:
+                    date_part, mins_part = lines[0].strip().split("|")
+                    if date_part == today_str:
+                        return int(mins_part)
+                except ValueError:
+                    return 0
+    return 0
+
+def save_total_minutes_today(minutes):
+    """Sauvegarde le temps total de divertissement du jour."""
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    with open(LOG_FILE, "w") as f:
+        f.write(f"{today_str}|{minutes}")
+
+class TransparentTimer:
+    def __init__(self, chrome_process):
+        self.root = tk.Tk()
+        self.chrome_process = chrome_process
         
-        # 1) OUVERTURE MAXIMISÉE (Prend tout l'écran en laissant la barre des tâches)
-        self.showMaximized()
-        self.is_fullscreen = False
-        
-        # Initialisation du chronomètre journalier
-        self.initial_daily_minutes = self.get_total_minutes_today()
+        # Initialisation du temps
+        self.initial_daily_minutes = get_total_minutes_today()
         self.session_seconds = 0
-        
-        # 2) CONFIGURATION DU NAVIGATEUR PERSISTANT (Garde les connexions)
-        os.makedirs(PROFILE_DIR, exist_ok=True)
-        self.profil = QWebEngineProfile("MonProfilDivertissement", self)
-        self.profil.setPersistentStoragePath(PROFILE_DIR)
-        self.profil.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
-        
-        # Création de la vue web associée au profil persistant
-        self.navigateur = QWebEngineView(self)
-        self.web_page = self.navigateur.page() # Accès à la page
-        # Lie la page au profil personnalisé créé juste au-dessus
-        self.navigateur.setPage(type(self.web_page)(self.profil, self.navigateur))
-        
-        self.navigateur.setUrl(QUrl(URL_DEPART))
-        
-        # Mise en page (Layout) sans bordures intérieures
-        layout = QVBoxLayout()
-        layout.addWidget(self.navigateur)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-        
-        # 3) INITIALISATION DU TIMER (Mise à jour à la seconde)
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_timer)
-        self.timer.start(1000) # S'exécute toutes les 1000ms (1 seconde)
+        self.alert_triggered = False
 
-    def get_total_minutes_today(self):
-        """Lit le fichier texte pour récupérer le temps déjà accumulé aujourd'hui."""
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        if os.path.exists(LOG_FILE_WEB):
-            with open(LOG_FILE_WEB, "r") as f:
-                lines = f.readlines()
-                if lines:
-                    try:
-                        date_part, mins_part = lines[0].strip().split("|")
-                        if date_part == today_str:
-                            return int(mins_part)
-                    except ValueError:
-                        return 0
-        return 0
+        # Fenêtre transparente et sans bordure
+        self.root.overrideredirect(True)
+        self.root.attributes("-topmost", True)
+        self.root.attributes("-transparentcolor", "black")
+        
+        # Positionnement en haut à gauche (X: 10, Y: 10)
+        self.root.geometry("+10+10")
 
-    def save_total_minutes_today(self, minutes):
-        """Sauvegarde le cumul des minutes du jour dans le fichier texte."""
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        with open(LOG_FILE_WEB, "w") as f:
-            f.write(f"{today_str}|{minutes}")
+        # Label avec fond noir (qui sera rendu invisible grâce à transparentcolor)
+        self.label = tk.Label(
+            self.root, 
+            text="", 
+            font=(FONT_FAMILY, FONT_SIZE, "bold"), 
+            fg=COLOR_BLUE, 
+            bg="black"
+        )
+        self.label.pack()
+
+        # Premier lancement de la boucle de mise à jour
+        self.update_timer()
 
     def update_timer(self):
-        """Incrémente le temps et sauvegarde automatiquement chaque minute."""
+        """Met à jour le chronomètre et vérifie si Chrome est toujours en vie."""
+        # 1. Vérification de l'état de Chrome
+        if not self.is_chrome_running():
+            self.on_closing()
+            return
+
+        # 2. Calcul du temps
         self.session_seconds += 1
-        
-        # Sauvegarde automatique en tâche de fond toutes les minutes
-        if self.session_seconds % 60 == 0:
-            session_minutes = self.session_seconds // 60
-            total_global = self.initial_daily_minutes + session_minutes
-            self.save_total_minutes_today(total_global)
+        session_minutes = self.session_seconds // 60
+        total_daily_minutes = self.initial_daily_minutes + session_minutes
 
-    def keyPressEvent(self, event):
-        """Permet de basculer en VRAI plein écran ou d'en sortir en pressant F11."""
-        if event.key() == Qt.Key.Key_F11:
-            if not self.is_fullscreen:
-                self.showFullScreen()
-                self.is_fullscreen = True
-            else:
-                self.showMaximized()
-                self.is_fullscreen = False
+        sh, sm = divmod(session_minutes, 60)
+        dh, dm = divmod(total_daily_minutes, 60)
+
+        # Formatage sans les secondes (anti-oppression)
+        display_text = f"📺 Session : {sh:02d}h{sm:02d} | 📅 Jour : {dh:02d}h{dm:02d}"
+
+        # 3. Gestion du seuil d'alerte (50 minutes)
+        if session_minutes >= ALERT_MINUTES:
+            display_text += " (Prends une pause !)"
+            self.label.config(fg=COLOR_RED)
+            
+            if not self.alert_triggered:
+                self.alert_triggered = True
+                self.root.after(100, self.show_alert)
         else:
-            super().keyPressEvent(event)
+            self.label.config(fg=COLOR_BLUE)
 
-    def closeEvent(self, event):
-        """Action déclenchée automatiquement dès que la fenêtre est fermée."""
+        self.label.config(text=display_text)
+
+        # Sauvegarde auto de sécurité toutes les minutes
+        if self.session_seconds % 60 == 0:
+            save_total_minutes_today(total_daily_minutes)
+
+        # Rappel de la fonction dans 1 seconde (1000ms)
+        self.root.after(1000, self.update_timer)
+
+    def is_chrome_running(self):
+        """Vérifie si notre instance de PWA Chrome spécifique tourne encore."""
+        try:
+            # On vérifie si le processus d'origine existe encore
+            if self.chrome_process.poll() is None:
+                return True
+            
+            # Double sécurité : on cherche si une fenêtre Chrome avec l'argument app est active
+            for proc in psutil.process_iter(['cmdline']):
+                cmd = proc.info.get('cmdline')
+                if cmd and f"--app={TARGET_URL}" in "".join(cmd):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def show_alert(self):
+        """Affiche la boîte de dialogue Windows pour la pause."""
+        messagebox.showwarning(
+            "Rappel de pause", 
+            "Cela serait idéal de faire une pause après tant de temps, non ?"
+        )
+        self.root.lift()
+
+    def on_closing(self):
+        """Sauvegarde finale et fermeture propre du widget."""
         final_session_minutes = self.session_seconds // 60
         final_daily_minutes = self.initial_daily_minutes + final_session_minutes
-        self.save_total_minutes_today(final_daily_minutes)
-        event.accept()
+        save_total_minutes_today(final_daily_minutes)
+        self.root.destroy()
+        sys.exit()
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    fenetre = DivertissementApp()
-    fenetre.show()
-    sys.exit(app.exec())
+    # Lancement de Google Chrome en mode application (PWA)
+    # L'argument --app= transforme l'onglet en fenêtre d'application autonome
+    try:
+        pwa_process = subprocess.Popen([CHROME_PATH, f"--app={TARGET_URL}"])
+    except FileNotFoundError:
+        print("Erreur : Google Chrome est introuvable au chemin spécifié.")
+        sys.exit()
+
+    # Pause d'une seconde pour laisser la fenêtre s'ouvrir avant d'attacher le tracker
+    time.sleep(1)
+
+    # Lancement du widget de tracking
+    app = TransparentTimer(pwa_process)
+    app.root.mainloop()
