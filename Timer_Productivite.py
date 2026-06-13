@@ -354,13 +354,28 @@ class LifeRPGApp(ctk.CTk):
                 sauvegarder_temps_du_jour(self.jour_minutes)
                 self.label_total.configure(text=self.generer_texte_total())
                 self.gerer_hud()
+                
                 if self.sound_limit_minutes > 0 and self.session_minutes >= self.sound_limit_minutes:
                     self.status = "FINISHED"
                     self.btn_action.configure(text="Relancer", fg_color="green")
                     self.gerer_hud()
                     self.play_alert_sound()
-                    # Déclenchement de la pop-up d'information Windows
-                    messagebox.showinfo("Session Terminée", f"Félicitations ! Votre session de {self.sound_limit_minutes} min est terminée.")
+                    
+                    # --- ASTUCE POUR FORCER LE PREMIER PLAN ABSOLU ---
+                    # Création d'une fenêtre de support invisible
+                    boite_forcee = tk.Toplevel()
+                    boite_forcee.withdraw()  # On cache la fenêtre principale de support
+                    boite_forcee.attributes("-topmost", True)  # On la positionne au premier plan absolu
+                    
+                    # On affiche l'alerte attachée à ce support prioritaire
+                    messagebox.showinfo(
+                        "Session Terminée", 
+                        f"Félicitations ! Votre session de {self.sound_limit_minutes} min est terminée.",
+                        parent=boite_forcee
+                    )
+                    
+                    # Nettoyage de la fenêtre de support après fermeture de l'alerte
+                    boite_forcee.destroy()
                     return
             self.after(1000, self.update_timer)
 
