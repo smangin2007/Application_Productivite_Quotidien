@@ -18,7 +18,6 @@ COULEUR_PAUSE = "#1E90FF"
 COULEUR_TERMINE = "#FFD700"
 
 # --- CONFIGURATION DES RANGS ---
-# Configuration allégée : les fichiers sons individuels ont été supprimés
 RANGS = [
     {"min": 600, "nom_prefixe": "(11) 👑 ", "mot": "LÉGENDE", "couleur": "#E2583E", "couleur_shine": "#FF8A75", "cycle_shine": 20000, "message_levelup": "Incroyable ! Vous avez atteint le sommet absolu. Vous êtes une véritable LÉGENDE ! 👑"}, 
     {"min": 470, "nom_prefixe": "(10) 🌟 ", "mot": "CHAMPION", "couleur": "#A335EE", "couleur_shine": "#D996FF", "cycle_shine": 30000, "message_levelup": "Quel exploit ! Vous entrez dans l'arène des plus grands. Rang CHAMPION débloqué ! 🌟"}, 
@@ -37,24 +36,31 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 def charger_temps_du_jour():
+    """Retourne un tuple (minutes_pro, minutes_perso)"""
     date_aujourdhui = time.strftime("%Y-%m-%d")
     if FICHIER_SAUVEGARDE.exists():
         with open(FICHIER_SAUVEGARDE, "r", encoding="utf-8") as f:
             contenu = f.read().strip()
             if not contenu or "|" not in contenu:
-                return 0
+                return 0, 0
             try:
-                date_sauvegardee, minutes = contenu.split("|")
-                if date_sauvegardee == date_aujourdhui:
-                    return int(minutes)
+                elements = contenu.split("|")
+                if len(elements) == 2:
+                    date_sauvegardee, minutes = elements
+                    if date_sauvegardee == date_aujourdhui:
+                        return int(minutes), 0  
+                elif len(elements) == 3:
+                    date_sauvegardee, min_pro, min_perso = elements
+                    if date_sauvegardee == date_aujourdhui:
+                        return int(min_pro), int(min_perso)
             except ValueError:
-                return 0
-    return 0
+                return 0, 0
+    return 0, 0
 
-def sauvegarder_temps_du_jour(minutes):
+def sauvegarder_temps_du_jour(min_pro, min_perso):
     date_aujourdhui = time.strftime("%Y-%m-%d")
     with open(FICHIER_SAUVEGARDE, "w", encoding="utf-8") as f:
-        f.write(f"{date_aujourdhui}|{minutes}")
+        f.write(f"{date_aujourdhui}|{min_pro}|{min_perso}")
 
 class LifeRPGApp(ctk.CTk):
     def __init__(self):
@@ -63,7 +69,7 @@ class LifeRPGApp(ctk.CTk):
         self.overrideredirect(True) 
         largeur_ecran = self.winfo_screenwidth()
         largeur_widget = 320
-        hauteur_widget = 170
+        hauteur_widget = 210  
         pos_x = largeur_ecran - largeur_widget - 20
         pos_y = 20
         self.geometry(f"{largeur_widget}x{hauteur_widget}+{pos_x}+{pos_y}")
@@ -75,7 +81,11 @@ class LifeRPGApp(ctk.CTk):
 
         self.status = "STOPPED"
         self.session_minutes = 0
-        self.jour_minutes = charger_temps_du_jour()
+        
+        # Chargement des deux catégories
+        self.jour_minutes_pro, self.jour_minutes_perso = charger_temps_du_jour()
+        self.type_travail = "Pro" 
+        
         self.sound_limit_minutes = 0
         self.secondes_accumulees = 0 
         
@@ -97,6 +107,11 @@ class LifeRPGApp(ctk.CTk):
         self.label_barre = None 
         
         self.setup_ui()
+
+    @property
+    def jour_minutes(self):
+        """Le niveau global dépend de la somme du temps Pro + Perso"""
+        return self.jour_minutes_pro + self.jour_minutes_perso
 
     def obtenir_rang_et_prochain(self):
         for i, rang in enumerate(RANGS):
@@ -139,19 +154,16 @@ class LifeRPGApp(ctk.CTk):
         self.id_animation_shine = self.after(120, self.executer_brillance_lettre)
 
     def declencher_popup_levelup(self, rang_actuel):
-        # Jouer le son de niveau unique (Skyrim) si le fichier existe et qu'on n'est pas Novice
         if rang_actuel["min"] > 0 and FICHIER_SON_LEVELUP.exists():
             try:
                 mixer.Sound(str(FICHIER_SON_LEVELUP)).play()
             except Exception as e: 
                 print(f"Erreur audio Level Up : {e}")
 
-        # Création de la fenêtre de support forcée au premier plan absolu
         boite_forcee = tk.Toplevel()
         boite_forcee.withdraw()
         boite_forcee.attributes("-topmost", True)
         
-        # Affichage de la boîte de message Windows avec le texte spécifique du niveau
         messagebox.showinfo(
             "⚡ MONTEE DE NIVEAU ! ⚡", 
             rang_actuel["message_levelup"],
@@ -193,11 +205,21 @@ class LifeRPGApp(ctk.CTk):
             self.label_barre = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD - 1, "bold"), bg="black")
             self.label_barre.pack(side="left")
 
-        prefixe = "⚔️ [EN COURS]" if self.status == "RUNNING" else "🛡️ [EN PAUSE]" if self.status == "PAUSED" else "🏆 [TERMINÉ]"
+        # Sélection de l'émoji en cours selon la catégorie choisie
+        if self.status == "RUNNING":
+            emoji_statut = "💼 [EN COURS]" if self.type_travail == "Pro" else "📓 [EN COURS]"
+        else:
+            emoji_statut = "🛡️ [EN PAUSE]" if self.status == "PAUSED" else "🏆 [TERMINÉ]"
+
         couleur_stats = COULEUR_EN_COURS if self.status == "RUNNING" else COULEUR_PAUSE if self.status == "PAUSED" else COULEUR_TERMINE
+        
         h_sess, m_sess = divmod(self.session_minutes, 60)
         h_jour, m_jour = divmod(self.jour_minutes, 60)
-        self.label_stats.config(text=f"{prefixe} Session: {h_sess:02d}h{m_sess:02d} | 📅 Jour: {h_jour:02d}h{m_jour:02d}", fg=couleur_stats)
+        
+        self.label_stats.config(
+            text=f"{emoji_statut} Session: {h_sess:02d}h{m_sess:02d} | 📅 Jour Total: {h_jour:02d}h{m_jour:02d}", 
+            fg=couleur_stats
+        )
 
         rang_actuel, prochain_rang = self.obtenir_rang_et_prochain()
         
@@ -208,7 +230,6 @@ class LifeRPGApp(ctk.CTk):
             self.label_mot_avant.config(text=rang_actuel.get("mot", ""), fg=rang_actuel["couleur"])
             self.label_barre.config(text=self.generer_barre_progression(rang_actuel, prochain_rang), fg=rang_actuel["couleur"])
             
-            # Déclenchement de la pop-up Windows avec le son unique
             self.declencher_popup_levelup(rang_actuel)
             return
 
@@ -229,8 +250,16 @@ class LifeRPGApp(ctk.CTk):
         self.label_total = ctk.CTkLabel(self, text=self.generer_texte_total(), font=(POLICE_PRINCIPALE, 13, "bold"), text_color="#aaaaaa")
         self.label_total.pack(pady=(15, 5))
 
-        self.sound_option = ctk.CTkOptionMenu(self, font=(POLICE_PRINCIPALE, 12), dropdown_font=(POLICE_PRINCIPALE, 12), values=["Pas d'alerte sonore", "Alerte après 25 min", "Alerte après 50 min", "Alerte Custom (1 min)"], command=self.change_sound_setting)
-        self.sound_option.pack(pady=5)
+        self.frame_menus = ctk.CTkFrame(self, fg_color="transparent")
+        self.frame_menus.pack(pady=5, fill="x", padx=15)
+
+        # Sélecteur de type de travail
+        self.type_option = ctk.CTkOptionMenu(self.frame_menus, width=130, font=(POLICE_PRINCIPALE, 11), dropdown_font=(POLICE_PRINCIPALE, 11), values=["💼 Travail Pro", "📓 Travail Perso"], command=self.change_type_setting)
+        self.type_option.pack(side="left", expand=True, padx=2)
+
+        # Menu d'alerte sonore
+        self.sound_option = ctk.CTkOptionMenu(self.frame_menus, width=150, font=(POLICE_PRINCIPALE, 11), dropdown_font=(POLICE_PRINCIPALE, 11), values=["Pas d'alerte sonore", "Alerte après 25 min", "Alerte après 50 min", "Alerte Custom (1 min)"], command=self.change_sound_setting)
+        self.sound_option.pack(side="right", expand=True, padx=2)
 
         self.frame_boutons = ctk.CTkFrame(self, fg_color="transparent")
         self.frame_boutons.pack(pady=10, fill="x", padx=20)
@@ -245,11 +274,17 @@ class LifeRPGApp(ctk.CTk):
         self.btn_close.pack(side="bottom", pady=5)
 
     def generer_texte_total(self):
-        h_jour, m_jour = divmod(self.jour_minutes, 60)
-        return f"📊 TEMPS TOTAL DU JOUR : {h_jour:02d}h{m_jour:02d}"
+        h_pro, m_pro = divmod(self.jour_minutes_pro, 60)
+        h_perso, m_perso = divmod(self.jour_minutes_perso, 60)
+        return f"💼 Pro: {h_pro:02d}h{m_pro:02d} | 📓 Perso: {h_perso:02d}h{m_perso:02d}"
 
     def change_sound_setting(self, choice):
         self.sound_limit_minutes = 0 if choice == "Pas d'alerte sonore" else 25 if choice == "Alerte après 25 min" else 50 if choice == "Alerte après 50 min" else 1
+
+    def change_type_setting(self, choice):
+        self.type_travail = "Pro" if "Pro" in choice else "Perso"
+        if self.status != "STOPPED":
+            self.gerer_hud()
 
     def action_clic(self):
         if self.status in ["STOPPED", "PAUSED"]:
@@ -273,8 +308,14 @@ class LifeRPGApp(ctk.CTk):
         if self.status == "RUNNING":
             self.secondes_accumulees += 1
             if self.secondes_accumulees >= 60:
-                self.secondes_accumulees = 0; self.session_minutes += 1; self.jour_minutes += 1
-                sauvegarder_temps_du_jour(self.jour_minutes)
+                self.secondes_accumulees = 0; self.session_minutes += 1
+                
+                if self.type_travail == "Pro":
+                    self.jour_minutes_pro += 1
+                else:
+                    self.jour_minutes_perso += 1
+                    
+                sauvegarder_temps_du_jour(self.jour_minutes_pro, self.jour_minutes_perso)
                 self.label_total.configure(text=self.generer_texte_total())
                 self.gerer_hud()
                 
@@ -284,7 +325,6 @@ class LifeRPGApp(ctk.CTk):
                     self.gerer_hud()
                     self.play_alert_sound()
                     
-                    # Fenêtre invisible de support pour forcer le premier plan absolu de l'alerte de session
                     boite_forcee = tk.Toplevel()
                     boite_forcee.withdraw()
                     boite_forcee.attributes("-topmost", True)

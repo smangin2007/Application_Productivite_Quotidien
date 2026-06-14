@@ -10,10 +10,10 @@ from tkinter import messagebox
 
 # --- CONFIGURATION GRAPHIQUE & POSITION ---
 FONT_FAMILY = "Montserrat"
-COLOR_BG = "#1A202C"         # Fond sombre pour le launcher
+COLOR_BG = "#1a1a1a"         # Fond sombre pour le launcher
 COLOR_BLUE = "#1A365D"       # Bleu foncé (Texte Timer)
 COLOR_RED = "#E53E3E"        # Rouge clair (Alerte Timer)
-COLOR_ACCENT = "#3182CE"     # Bleu boutons actifs
+COLOR_ACCENT = "#1E90FF"     # Bleu boutons actifs
 COLOR_DISABLED = "#4A5568"   # Gris boutons bloqués
 ALERT_MINUTES = 50           # Seuil d'alerte pour la pause
 
@@ -140,7 +140,7 @@ class MainApplication:
     def create_transparent_timer(self):
         """Crée le widget de chronomètre transparent en haut à gauche."""
         self.timer_window = tk.Toplevel(self.root)
-        self.timer_window.geometry("+10+10")
+        self.timer_window.geometry("+20+20")
         self.timer_window.overrideredirect(True)
         self.timer_window.wm_attributes("-topmost", True) # Le timer reste visible pendant qu'on regarde la PWA
         self.timer_window.config(bg="black")
@@ -166,7 +166,7 @@ class MainApplication:
         th = total_mins // 60
         tm = total_mins % 60
 
-        timer_text = f"实用 Session : {sh:02d}h{sm:02d} | 📅 Jour : {th:02d}h{tm:02d}"
+        timer_text = f"📺 Session : {sh:02d}h{sm:02d} | 📅 Jour : {th:02d}h{tm:02d}"
 
         if session_mins >= ALERT_MINUTES:
             timer_text += " (Fais une pause !)"
@@ -179,11 +179,18 @@ class MainApplication:
         self.label_timer.configure(text=timer_text)
 
     def show_alert(self):
-        """Affiche l'alerte Windows sans bloquer le timer."""
+        """Affiche l'alerte Windows forcée au premier plan sans bloquer le timer."""
+        # Création d'une mini-fenêtre invisible de premier plan pour servir de parent à la boîte de dialogue
+        top = tk.Toplevel()
+        top.withdraw() # Rend la fenêtre invisible
+        top.wm_attributes("-topmost", True) # Force cette zone au tout premier plan de Windows
+        
         messagebox.showwarning(
             "Rappel de pause", 
-            "Cela serait idéal de faire une pause après tant de temps, non ?"
+            "Cela serait idéal de faire une pause après tant de temps, non ?",
+            parent=top # Associe l'alerte au parent invisible qui est au premier plan
         )
+        top.destroy() # Détruit la fenêtre invisible après la fermeture de l'alerte
 
     def is_chrome_pwa_open(self):
         """Vérifie si la fenêtre Chrome applicative spécifique est toujours active."""
