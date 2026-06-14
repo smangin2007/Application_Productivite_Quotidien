@@ -4,6 +4,8 @@ import time
 import subprocess
 import threading
 import psutil
+import json
+from pathlib import Path
 from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
@@ -16,14 +18,12 @@ COLOR_RED = "#E53E3E"        # Rouge clair (Alerte Timer)
 COLOR_ACCENT = "#1E90FF"     # Bleu boutons actifs
 COLOR_DISABLED = "#4A5568"   # Gris boutons bloqués
 ALERT_MINUTES = 50           # Seuil d'alerte pour la pause
-
-# Positionnement du Widget principal (Ex: à droite de l'écran, 400x500)
 WIDGET_GEOMETRY = "400x500+1100+200" 
 
 CHROME_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-LOG_FILE = os.path.join(os.path.expanduser("~"), "divertissement_daily_timer.txt")
+DOSSIER_SCRIPT = Path(__file__).parent.resolve()
+FICHIER_SAUVEGARDE = DOSSIER_SCRIPT / "daily_stats.json"
 
-# Liste restreinte aux 4 sites de divertissement principaux
 SITES = {
     "YouTube": "https://www.youtube.com",
     "Netflix": "https://www.netflix.com",
@@ -31,27 +31,44 @@ SITES = {
     "Free TV": "https://tv.free.fr/"
 }
 
+# --- FONCTIONS DE SAUVEGARDE CENTRALISEES ---
+def lire_statistiques_jour():
+    aujourdhui = datetime.now().strftime("%Y-%m-%d")
+    stats_defaut = {"pro": 0, "perso": 0, "jeu": 0, "divertissement": 0}
+    if FICHIER_SAUVEGARDE.exists():
+        try:
+            with open(FICHIER_SAUVEGARDE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if aujourdhui in data:
+                    stats_defaut.update(data[aujourdhui])
+                    return stats_defaut
+        except json.JSONDecodeError:
+            pass
+    return stats_defaut
+
+def sauvegarder_statistiques_jour(nouvelles_valeurs):
+    aujourdhui = datetime.now().strftime("%Y-%m-%d")
+    data = {}
+    if FICHIER_SAUVEGARDE.exists():
+        try:
+            with open(FICHIER_SAUVEGARDE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            pass
+    if aujourdhui not in data:
+        data[aujourdhui] = {"pro": 0, "perso": 0, "jeu": 0, "divertissement": 0}
+        
+    data[aujourdhui].update(nouvelles_valeurs)
+    with open(FICHIER_SAUVEGARDE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
 def get_total_minutes_today():
-    """Récupère le temps accumulé aujourd'hui dans le log."""
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    if os.path.exists(LOG_FILE):
-        with open(LOG_FILE, "r") as f:
-            lines = f.readlines()
-            if lines:
-                try:
-                    date_part, mins_part = lines[0].strip().split("|")
-                    if date_part == today_str:
-                        return int(mins_part)
-                except ValueError:
-                    pass
-    return 0
+    return lire_statistiques_jour()["divertissement"]
 
 def save_total_minutes_today(minutes):
-    """Sauvegarde le temps total du jour."""
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    with open(LOG_FILE, "w") as f:
-        f.write(f"{today_str}|{minutes}")
+    sauvegarder_statistiques_jour({"divertissement": minutes})
 
+# --- APPLICATION PRINCIPALE ---
 class MainApplication:
     def __init__(self, root):
         self.root = root
@@ -59,31 +76,24 @@ class MainApplication:
         self.root.geometry(WIDGET_GEOMETRY)
         self.root.configure(bg=COLOR_BG)
         
-        # --- Transformation en Widget de Fond d'écran ---
-        self.root.overrideredirect(True) # Supprime la barre de titre et les bordures
-        self.root.lower() # Place la fenêtre au niveau du fond d'écran
-        
-        # Astuce pour maintenir le widget en arrière-plan sous Windows
+        self.root.overrideredirect(True) 
+        self.root.lower() 
         self.root.bind("<FocusIn>", lambda e: self.root.lower())
         
         self.session_active = False
         self.current_target_url = ""
         self.pwa_process = None
         
-        # Données de suivi du temps
         self.initial_daily_minutes = get_total_minutes_today()
         self.session_seconds = 0
         
-        # --- Interface du Launcher ---
         self.label_title = tk.Label(
             root, text="Plateforme Divertissement", 
             font=(FONT_FAMILY, 16, "bold"), fg="white", bg=COLOR_BG, pady=25
         )
         self.label_title.pack()
 
-        # Dictionnaire pour stocker les composants des boutons
         self.buttons = {}
-        
         for name, url in SITES.items():
             btn = tk.Button(
                 root, text=name, font=(FONT_FAMILY, 12),
@@ -94,20 +104,16 @@ class MainApplication:
             btn.pack(pady=10)
             self.buttons[name] = btn
 
-        # --- Note de rappel en bas du widget ---
         self.label_note = tk.Label(
             root, text="NB : ferme tes fenêtres chrome",
             font=(FONT_FAMILY, 10, "italic"), fg="#A0AEC0", bg=COLOR_BG
         )
-        # Le pack avec side="bottom" et pady pousse le texte tout en bas
         self.label_note.pack(side="bottom", pady=20)
 
-        # --- Fenêtre du Chronomètre Transparent (cachée au début) ---
         self.timer_window = None
         self.label_timer = None
 
     def start_session(self, name, url):
-        """Lance l'application sélectionnée et active le tracker."""
         if self.session_active:
             return 
             
@@ -116,17 +122,14 @@ class MainApplication:
         self.session_seconds = 0
         self.initial_daily_minutes = get_total_minutes_today()
         
-        # 1. Bloquer visuellement l'interface du Launcher
         for btn_name, btn_widget in self.buttons.items():
             if btn_name == name:
                 btn_widget.configure(bg="#2B6CB0", state="disabled") 
             else:
                 btn_widget.configure(bg=COLOR_DISABLED, state="disabled") 
 
-        # 2. Créer la fenêtre du Chronomètre Transparent floating
         self.create_transparent_timer()
 
-        # 3. Lancer Chrome en mode PWA
         try:
             self.pwa_process = subprocess.Popen([CHROME_PATH, f"--app={url}"])
         except FileNotFoundError:
@@ -134,15 +137,13 @@ class MainApplication:
             self.reset_launcher_interface()
             return
 
-        # 4. Lancer la surveillance de session dans un thread séparé
         threading.Thread(target=self.monitor_session, daemon=True).start()
 
     def create_transparent_timer(self):
-        """Crée le widget de chronomètre transparent en haut à gauche."""
         self.timer_window = tk.Toplevel(self.root)
         self.timer_window.geometry("+20+20")
         self.timer_window.overrideredirect(True)
-        self.timer_window.wm_attributes("-topmost", True) # Le timer reste visible pendant qu'on regarde la PWA
+        self.timer_window.wm_attributes("-topmost", True) 
         self.timer_window.config(bg="black")
         self.timer_window.wm_attributes("-transparentcolor", "black")
 
@@ -154,7 +155,6 @@ class MainApplication:
         self.update_timer_display()
 
     def update_timer_display(self):
-        """Met à jour l'affichage du texte du chronomètre toutes les minutes."""
         if not self.session_active or not self.timer_window:
             return
 
@@ -179,21 +179,18 @@ class MainApplication:
         self.label_timer.configure(text=timer_text)
 
     def show_alert(self):
-        """Affiche l'alerte Windows forcée au premier plan sans bloquer le timer."""
-        # Création d'une mini-fenêtre invisible de premier plan pour servir de parent à la boîte de dialogue
         top = tk.Toplevel()
-        top.withdraw() # Rend la fenêtre invisible
-        top.wm_attributes("-topmost", True) # Force cette zone au tout premier plan de Windows
+        top.withdraw() 
+        top.wm_attributes("-topmost", True) 
         
         messagebox.showwarning(
             "Rappel de pause", 
             "Cela serait idéal de faire une pause après tant de temps, non ?",
-            parent=top # Associe l'alerte au parent invisible qui est au premier plan
+            parent=top 
         )
-        top.destroy() # Détruit la fenêtre invisible après la fermeture de l'alerte
+        top.destroy() 
 
     def is_chrome_pwa_open(self):
-        """Vérifie si la fenêtre Chrome applicative spécifique est toujours active."""
         try:
             for proc in psutil.process_iter(['cmdline']):
                 cmd = proc.info.get('cmdline')
@@ -204,9 +201,7 @@ class MainApplication:
         return False
 
     def monitor_session(self):
-        """Boucle de fond qui suit le temps et attend la fermeture de Chrome."""
         time.sleep(2) 
-        
         while self.session_active:
             if not self.is_chrome_pwa_open():
                 self.end_session()
@@ -219,9 +214,7 @@ class MainApplication:
                 self.root.after(0, self.update_timer_display)
 
     def end_session(self):
-        """Ferme le chronomètre, sauvegarde et réactive le Launcher automatiquement."""
         self.session_active = False
-        
         final_session_minutes = self.session_seconds // 60
         final_daily_minutes = self.initial_daily_minutes + final_session_minutes
         save_total_minutes_today(final_daily_minutes)
@@ -233,7 +226,6 @@ class MainApplication:
         self.root.after(0, self.reset_launcher_interface)
 
     def reset_launcher_interface(self):
-        """Rend à nouveau tous les boutons cliquables et remet le widget en arrière-plan."""
         for name, btn_widget in self.buttons.items():
             btn_widget.configure(bg=COLOR_ACCENT, state="normal")
         self.root.lower()

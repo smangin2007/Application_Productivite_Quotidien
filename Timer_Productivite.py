@@ -1,14 +1,16 @@
 import tkinter as tk
-from tkinter import messagebox  # Import pour les boîtes de message Windows
+from tkinter import messagebox
 import customtkinter as ctk
 from pygame import mixer
 import time
+import json
 from pathlib import Path
+from datetime import datetime
 
 # --- CONFIGURATION ---
 DOSSIER_SCRIPT = Path(__file__).parent.resolve()
-FICHIER_SAUVEGARDE = DOSSIER_SCRIPT / "temps_travail.txt"
-FICHIER_SON_LEVELUP = DOSSIER_SCRIPT / "skyrim_levelup.mp3"  # Fichier audio unique pour toutes les montées
+FICHIER_SAUVEGARDE = DOSSIER_SCRIPT / "daily_stats.json"
+FICHIER_SON_LEVELUP = DOSSIER_SCRIPT / "skyrim_levelup.mp3"
 TAILLE_POLICE_HUD = 14
 POLICE_PRINCIPALE = "Montserrat"
 
@@ -35,33 +37,45 @@ RANGS = [
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
-def charger_temps_du_jour():
-    """Retourne un tuple (minutes_pro, minutes_perso)"""
-    date_aujourdhui = time.strftime("%Y-%m-%d")
+# --- FONCTIONS DE SAUVEGARDE CENTRALISEES ---
+def lire_statistiques_jour():
+    aujourdhui = datetime.now().strftime("%Y-%m-%d")
+    stats_defaut = {"pro": 0, "perso": 0, "jeu": 0, "divertissement": 0}
     if FICHIER_SAUVEGARDE.exists():
-        with open(FICHIER_SAUVEGARDE, "r", encoding="utf-8") as f:
-            contenu = f.read().strip()
-            if not contenu or "|" not in contenu:
-                return 0, 0
-            try:
-                elements = contenu.split("|")
-                if len(elements) == 2:
-                    date_sauvegardee, minutes = elements
-                    if date_sauvegardee == date_aujourdhui:
-                        return int(minutes), 0  
-                elif len(elements) == 3:
-                    date_sauvegardee, min_pro, min_perso = elements
-                    if date_sauvegardee == date_aujourdhui:
-                        return int(min_pro), int(min_perso)
-            except ValueError:
-                return 0, 0
-    return 0, 0
+        try:
+            with open(FICHIER_SAUVEGARDE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if aujourdhui in data:
+                    stats_defaut.update(data[aujourdhui])
+                    return stats_defaut
+        except json.JSONDecodeError:
+            pass
+    return stats_defaut
+
+def sauvegarder_statistiques_jour(nouvelles_valeurs):
+    aujourdhui = datetime.now().strftime("%Y-%m-%d")
+    data = {}
+    if FICHIER_SAUVEGARDE.exists():
+        try:
+            with open(FICHIER_SAUVEGARDE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            pass
+    if aujourdhui not in data:
+        data[aujourdhui] = {"pro": 0, "perso": 0, "jeu": 0, "divertissement": 0}
+        
+    data[aujourdhui].update(nouvelles_valeurs)
+    with open(FICHIER_SAUVEGARDE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
+
+def charger_temps_du_jour():
+    stats = lire_statistiques_jour()
+    return stats["pro"], stats["perso"]
 
 def sauvegarder_temps_du_jour(min_pro, min_perso):
-    date_aujourdhui = time.strftime("%Y-%m-%d")
-    with open(FICHIER_SAUVEGARDE, "w", encoding="utf-8") as f:
-        f.write(f"{date_aujourdhui}|{min_pro}|{min_perso}")
+    sauvegarder_statistiques_jour({"pro": min_pro, "perso": min_perso})
 
+# --- APPLICATION PRINCIPALE ---
 class LifeRPGApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -82,7 +96,6 @@ class LifeRPGApp(ctk.CTk):
         self.status = "STOPPED"
         self.session_minutes = 0
         
-        # Chargement des deux catégories
         self.jour_minutes_pro, self.jour_minutes_perso = charger_temps_du_jour()
         self.type_travail = "Pro" 
         
@@ -110,7 +123,6 @@ class LifeRPGApp(ctk.CTk):
 
     @property
     def jour_minutes(self):
-        """Le niveau global dépend de la somme du temps Pro + Perso"""
         return self.jour_minutes_pro + self.jour_minutes_perso
 
     def obtenir_rang_et_prochain(self):
@@ -205,7 +217,6 @@ class LifeRPGApp(ctk.CTk):
             self.label_barre = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD - 1, "bold"), bg="black")
             self.label_barre.pack(side="left")
 
-        # Sélection de l'émoji en cours selon la catégorie choisie
         if self.status == "RUNNING":
             emoji_statut = "💼 [EN COURS]" if self.type_travail == "Pro" else "📓 [EN COURS]"
         else:
@@ -253,11 +264,9 @@ class LifeRPGApp(ctk.CTk):
         self.frame_menus = ctk.CTkFrame(self, fg_color="transparent")
         self.frame_menus.pack(pady=5, fill="x", padx=15)
 
-        # Sélecteur de type de travail
         self.type_option = ctk.CTkOptionMenu(self.frame_menus, width=130, font=(POLICE_PRINCIPALE, 11), dropdown_font=(POLICE_PRINCIPALE, 11), values=["💼 Travail Pro", "📓 Travail Perso"], command=self.change_type_setting)
         self.type_option.pack(side="left", expand=True, padx=2)
 
-        # Menu d'alerte sonore
         self.sound_option = ctk.CTkOptionMenu(self.frame_menus, width=150, font=(POLICE_PRINCIPALE, 11), dropdown_font=(POLICE_PRINCIPALE, 11), values=["Pas d'alerte sonore", "Alerte après 25 min", "Alerte après 50 min", "Alerte Custom (1 min)"], command=self.change_sound_setting)
         self.sound_option.pack(side="right", expand=True, padx=2)
 
