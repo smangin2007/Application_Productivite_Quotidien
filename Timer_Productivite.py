@@ -1,15 +1,14 @@
 import tkinter as tk
-from tkinter import messagebox  # Import pour la boîte de message Windows
+from tkinter import messagebox  # Import pour les boîtes de message Windows
 import customtkinter as ctk
 from pygame import mixer
 import time
 from pathlib import Path
-from PIL import Image, ImageTk, ImageSequence
 
 # --- CONFIGURATION ---
 DOSSIER_SCRIPT = Path(__file__).parent.resolve()
 FICHIER_SAUVEGARDE = DOSSIER_SCRIPT / "temps_travail.txt"
-FICHIER_GIF_LEVELUP = DOSSIER_SCRIPT / "levelup.gif"
+FICHIER_SON_LEVELUP = DOSSIER_SCRIPT / "skyrim_levelup.mp3"  # Fichier audio unique pour toutes les montées
 TAILLE_POLICE_HUD = 14
 POLICE_PRINCIPALE = "Montserrat"
 
@@ -19,18 +18,19 @@ COULEUR_PAUSE = "#1E90FF"
 COULEUR_TERMINE = "#FFD700"
 
 # --- CONFIGURATION DES RANGS ---
+# Configuration allégée : les fichiers sons individuels ont été supprimés
 RANGS = [
-    {"min": 600, "nom_prefixe": "(11) 👑 ", "mot": "LÉGENDE", "couleur": "#E2583E", "couleur_shine": "#FF8A75", "cycle_shine": 20000, "son": "level_legende.mp3", "duree_son": 13000, "gif_rang": "gif_legende.gif"}, 
-    {"min": 470, "nom_prefixe": "(10) 🌟 ", "mot": "CHAMPION", "couleur": "#A335EE", "couleur_shine": "#D996FF", "cycle_shine": 30000, "son": "level_champion.mp3", "duree_son": 13000, "gif_rang": "gif_champion.gif"}, 
-    {"min": 360, "nom_prefixe": "(9) 🔥 ", "mot": "HÉROS", "couleur": "#FF8000", "couleur_shine": "#FFAE59", "cycle_shine": 40000, "son": "level_heros.mp3", "duree_son": 10000, "gif_rang": "gif_heros.gif"},       
-    {"min": 260, "nom_prefixe": "(8) 🔱 ", "mot": "PALADIN", "couleur": "#0070DD", "couleur_shine": "#66B2FF", "cycle_shine": 50000, "son": "level_paladin.mp3", "duree_son": 10000, "gif_rang": "gif_paladin.gif"},     
-    {"min": 180, "nom_prefixe": "(7) ⚔️ ", "mot": "CHEVALIER", "couleur": "#1EFF00", "couleur_shine": "#A3FF94", "cycle_shine": 60000, "son": "level_chevalier.mp3", "duree_son": 8000, "gif_rang": "gif_chevalier.gif"}, 
-    {"min": 120, "nom_prefixe": "(6) 🛡️ DÉFENSEUR", "couleur": "#00FFDD", "son": "level_defenseur.mp3", "duree_son": 8000, "gif_rang": "gif_defenseur.gif"},
-    {"min": 75,  "nom_prefixe": "(5) 🏟️ GLADIATEUR", "couleur": "#FFFF00", "son": "level_gladiateur.mp3", "duree_son": 8000, "gif_rang": "gif_gladiateur.gif"},
-    {"min": 45,  "nom_prefixe": "(4) 💰 MERCENAIRE", "couleur": "#B0B0B0", "son": "level_mercenaire.mp3", "duree_son": 5000, "gif_rang": "gif_mercenaire.gif"},
-    {"min": 25,  "nom_prefixe": "(3) 👁️ GARDIEN", "couleur": "#714321", "son": "level_gardien.mp3", "duree_son": 5000, "gif_rang": "gif_gardien.gif"},
-    {"min": 10,  "nom_prefixe": "(2) 🎒 AVENTURIER", "couleur": "#FFFFFF", "son": "level_aventurier.mp3", "duree_son": 5000, "gif_rang": "gif_aventurier.gif"},
-    {"min": 0,   "nom_prefixe": "(1) 🌱 NOVICE", "couleur": "#90EE90", "son": None, "duree_son": 0, "gif_rang": None}
+    {"min": 600, "nom_prefixe": "(11) 👑 ", "mot": "LÉGENDE", "couleur": "#E2583E", "couleur_shine": "#FF8A75", "cycle_shine": 20000, "message_levelup": "Incroyable ! Vous avez atteint le sommet absolu. Vous êtes une véritable LÉGENDE ! 👑"}, 
+    {"min": 470, "nom_prefixe": "(10) 🌟 ", "mot": "CHAMPION", "couleur": "#A335EE", "couleur_shine": "#D996FF", "cycle_shine": 30000, "message_levelup": "Quel exploit ! Vous entrez dans l'arène des plus grands. Rang CHAMPION débloqué ! 🌟"}, 
+    {"min": 360, "nom_prefixe": "(9) 🔥 ", "mot": "HÉROS", "couleur": "#FF8000", "couleur_shine": "#FFAE59", "cycle_shine": 40000, "message_levelup": "Votre détermination inspire le respect. Vous êtes désormais un HÉROS ! 🔥"},       
+    {"min": 260, "nom_prefixe": "(8) 🔱 ", "mot": "PALADIN", "couleur": "#0070DD", "couleur_shine": "#66B2FF", "cycle_shine": 50000, "message_levelup": "Une force inébranlable vous habite. Vous voilà élevé au rang de PALADIN ! 🔱"},     
+    {"min": 180, "nom_prefixe": "(7) ⚔️ ", "mot": "CHEVALIER", "couleur": "#1EFF00", "couleur_shine": "#A3FF94", "cycle_shine": 60000, "message_levelup": "Adoubé pour votre assiduité ! Vous atteignez le rang de CHEVALIER ! ⚔️"}, 
+    {"min": 120, "nom_prefixe": "(6) 🛡️ DÉFENSEUR", "couleur": "#00FFDD", "message_levelup": "Votre discipline devient votre meilleur bouclier. Vous êtes un DÉFENSEUR ! 🛡️"},
+    {"min": 75,  "nom_prefixe": "(5) 🏟️ GLADIATEUR", "couleur": "#FFFF00", "message_levelup": "Vous maîtrisez le rythme de votre travail. Bienvenue au rang de GLADIATEUR ! 🏟️"},
+    {"min": 45,  "nom_prefixe": "(4) 💰 MERCENAIRE", "couleur": "#B0B0B0", "message_levelup": "L'effort commence à porter ses fruits ! Vous passez MERCENAIRE ! 💰"},
+    {"min": 25,  "nom_prefixe": "(3) 👁️ GARDIEN", "couleur": "#714321", "message_levelup": "Votre concentration s'aiguise. Vous débloquez le rang de GARDIEN ! 👁️"},
+    {"min": 10,  "nom_prefixe": "(2) 🎒 AVENTURIER", "couleur": "#FFFFFF", "message_levelup": "Premier pas important ! Vous quittez l'état sauvage pour devenir AVENTURIER ! 🎒"},
+    {"min": 0,   "nom_prefixe": "(1) 🌱 NOVICE", "couleur": "#90EE90", "message_levelup": ""}
 ]
 
 ctk.set_appearance_mode("dark")
@@ -63,7 +63,7 @@ class LifeRPGApp(ctk.CTk):
         self.overrideredirect(True) 
         largeur_ecran = self.winfo_screenwidth()
         largeur_widget = 320
-        hauteur_widget = 150  # Réduction de la hauteur car le menu de test a été supprimé
+        hauteur_widget = 170
         pos_x = largeur_ecran - largeur_widget - 20
         pos_y = 20
         self.geometry(f"{largeur_widget}x{hauteur_widget}+{pos_x}+{pos_y}")
@@ -80,20 +80,15 @@ class LifeRPGApp(ctk.CTk):
         self.secondes_accumulees = 0 
         
         self.rang_precedent = self.obtenir_rang_et_prochain()[0]
-        self.en_animation_levelup = False
-        self.opacite_actuelle = 1.0
         
         self.lettre_brillante_index = -1
         self.id_animation_shine = None
-        self.id_animation_gif = None
         
         mixer.init()
         
         self.hud = None
         self.label_stats = None
         self.frame_basse = None
-        self.label_gif_levelup = None
-        self.label_gif_custom = None
         
         self.label_prefixe = None
         self.label_mot_avant = None
@@ -101,54 +96,7 @@ class LifeRPGApp(ctk.CTk):
         self.label_mot_apres = None
         self.label_barre = None 
         
-        self.frames_levelup = []
-        self.caches_gifs_rangs = {} 
-        self.charger_tous_les_gifs()
-        
         self.setup_ui()
-
-    def decouper_gif(self, chemin_fichier, dimension=(160, 50)):
-        liste_frames = []
-        if chemin_fichier and chemin_fichier.exists():
-            try:
-                im = Image.open(chemin_fichier)
-                for frame in ImageSequence.Iterator(im):
-                    frame_res = frame.copy().convert("RGBA").resize(dimension, Image.Resampling.LANCZOS)
-                    liste_frames.append(ImageTk.PhotoImage(frame_res))
-            except Exception as e:
-                print(f"Erreur découpage GIF ({chemin_fichier.name}) : {e}")
-        return liste_frames
-
-    def charger_tous_les_gifs(self):
-        self.frames_levelup = self.decouper_gif(FICHIER_GIF_LEVELUP, (160, 45))
-        for rang in RANGS:
-            if rang["gif_rang"]:
-                chemin_gif = DOSSIER_SCRIPT / rang["gif_rang"]
-                if chemin_gif.exists():
-                    self.caches_gifs_rangs[rang["gif_rang"]] = self.decouper_gif(chemin_gif, (160, 55))
-
-    def animer_gifs_conjointement(self, index_levelup=0, index_custom=0):
-        if not self.hud or not self.en_animation_levelup:
-            if self.label_gif_levelup: self.label_gif_levelup.pack_forget()
-            if self.label_gif_custom: self.label_gif_custom.pack_forget()
-            return
-
-        rang_actuel = self.rang_precedent
-
-        if self.frames_levelup:
-            img_lu = self.frames_levelup[index_levelup]
-            self.label_gif_levelup.config(image=img_lu)
-            index_levelup = (index_levelup + 1) % len(self.frames_levelup)
-
-        nom_gif_custom = rang_actuel["gif_rang"]
-        if nom_gif_custom and nom_gif_custom in self.caches_gifs_rangs:
-            frames_custom = self.caches_gifs_rangs[nom_gif_custom]
-            if frames_custom:
-                img_cust = frames_custom[index_custom]
-                self.label_gif_custom.config(image=img_cust)
-                index_custom = (index_custom + 1) % len(frames_custom)
-
-        self.id_animation_gif = self.after(50, lambda: self.animer_gifs_conjointement(index_levelup, index_custom))
 
     def obtenir_rang_et_prochain(self):
         for i, rang in enumerate(RANGS):
@@ -174,7 +122,7 @@ class LifeRPGApp(ctk.CTk):
         self.id_animation_shine = self.after(delai_ms, self.executer_brillance_lettre)
 
     def executer_brillance_lettre(self):
-        if self.status == "STOPPED" or not self.hud or self.en_animation_levelup: return
+        if self.status == "STOPPED" or not self.hud: return
         rang_actuel, _ = self.obtenir_rang_et_prochain()
         if "mot" not in rang_actuel: return
         mot = rang_actuel["mot"]
@@ -190,52 +138,31 @@ class LifeRPGApp(ctk.CTk):
         self.label_mot_apres.config(text=mot[self.lettre_brillante_index + 1:], fg=rang_actuel["couleur"])
         self.id_animation_shine = self.after(120, self.executer_brillance_lettre)
 
-    def fade_in(self):
-        if not self.hud or not self.en_animation_levelup: return
-        if self.opacite_actuelle < 1.0:
-            self.opacite_actuelle += 0.1
-            self.hud.wm_attributes("-alpha", self.opacite_actuelle)
-            self.after(30, self.fade_in)
-
-    def fade_out(self):
-        if not self.hud: return
-        if self.opacite_actuelle > 0.0:
-            self.opacite_actuelle -= 0.1
-            self.hud.wm_attributes("-alpha", self.opacite_actuelle)
-            self.after(30, self.fade_out)
-        else:
-            self.en_animation_levelup = False
-            if self.label_gif_levelup: self.label_gif_levelup.pack_forget()
-            if self.label_gif_custom: self.label_gif_custom.pack_forget()
-            self.opacite_actuelle = 1.0
-            self.hud.wm_attributes("-alpha", 1.0)
-            self.gerer_hud()
-
-    def jouer_son_et_declencher_double_gif(self, rang_actuel):
-        self.en_animation_levelup = True
-        if rang_actuel["son"]:
+    def declencher_popup_levelup(self, rang_actuel):
+        # Jouer le son de niveau unique (Skyrim) si le fichier existe et qu'on n'est pas Novice
+        if rang_actuel["min"] > 0 and FICHIER_SON_LEVELUP.exists():
             try:
-                mixer.Sound(str(DOSSIER_SCRIPT / rang_actuel["son"])).play()
-            except Exception as e: print(f"Erreur audio : {e}")
+                mixer.Sound(str(FICHIER_SON_LEVELUP)).play()
+            except Exception as e: 
+                print(f"Erreur audio Level Up : {e}")
 
-        self.opacite_actuelle = 0.0
-        self.hud.wm_attributes("-alpha", 0.0)
-        self.fade_in()
-
-        if self.frames_levelup and self.label_gif_levelup:
-            self.label_gif_levelup.pack(anchor="w", pady=(4, 0))
-        nom_gif_custom = rang_actuel["gif_rang"]
-        if nom_gif_custom and nom_gif_custom in self.caches_gifs_rangs and self.label_gif_custom:
-            self.label_gif_custom.pack(anchor="w", pady=(2, 0))
-
-        self.animer_gifs_conjointement()
-        self.after(max(500, rang_actuel["duree_son"] - 400), self.fade_out)
+        # Création de la fenêtre de support forcée au premier plan absolu
+        boite_forcee = tk.Toplevel()
+        boite_forcee.withdraw()
+        boite_forcee.attributes("-topmost", True)
+        
+        # Affichage de la boîte de message Windows avec le texte spécifique du niveau
+        messagebox.showinfo(
+            "⚡ MONTEE DE NIVEAU ! ⚡", 
+            rang_actuel["message_levelup"],
+            parent=boite_forcee
+        )
+        boite_forcee.destroy()
 
     def gerer_hud(self):
-        if self.status == "STOPPED" and not self.en_animation_levelup:
+        if self.status == "STOPPED":
             if self.hud:
                 if self.id_animation_shine: self.after_cancel(self.id_animation_shine)
-                if self.id_animation_gif: self.after_cancel(self.id_animation_gif)
                 self.hud.destroy()
                 self.hud = None
             return
@@ -265,11 +192,6 @@ class LifeRPGApp(ctk.CTk):
             self.label_mot_apres.pack(side="left")
             self.label_barre = tk.Label(self.frame_basse, font=(POLICE_PRINCIPALE, TAILLE_POLICE_HUD - 1, "bold"), bg="black")
             self.label_barre.pack(side="left")
-            
-            self.label_gif_levelup = tk.Label(self.hud, bg="black")
-            self.label_gif_custom = tk.Label(self.hud, bg="black")
-
-        if self.en_animation_levelup: return
 
         prefixe = "⚔️ [EN COURS]" if self.status == "RUNNING" else "🛡️ [EN PAUSE]" if self.status == "PAUSED" else "🏆 [TERMINÉ]"
         couleur_stats = COULEUR_EN_COURS if self.status == "RUNNING" else COULEUR_PAUSE if self.status == "PAUSED" else COULEUR_TERMINE
@@ -285,7 +207,9 @@ class LifeRPGApp(ctk.CTk):
             self.label_prefixe.config(text=rang_actuel["nom_prefixe"], fg=rang_actuel["couleur"])
             self.label_mot_avant.config(text=rang_actuel.get("mot", ""), fg=rang_actuel["couleur"])
             self.label_barre.config(text=self.generer_barre_progression(rang_actuel, prochain_rang), fg=rang_actuel["couleur"])
-            self.jouer_son_et_declencher_double_gif(rang_actuel)
+            
+            # Déclenchement de la pop-up Windows avec le son unique
+            self.declencher_popup_levelup(rang_actuel)
             return
 
         self.label_prefixe.config(text=rang_actuel["nom_prefixe"], fg=rang_actuel["couleur"])
@@ -340,9 +264,8 @@ class LifeRPGApp(ctk.CTk):
             self.gerer_hud()
 
     def stop_timer(self):
-        self.status = "STOPPED"; self.session_minutes = 0; self.secondes_accumulees = 0; self.en_animation_levelup = False
+        self.status = "STOPPED"; self.session_minutes = 0; self.secondes_accumulees = 0
         if self.id_animation_shine: self.after_cancel(self.id_animation_shine); self.id_animation_shine = None
-        if self.id_animation_gif: self.after_cancel(self.id_animation_gif); self.id_animation_gif = None
         self.btn_action.configure(text="Lancer", fg_color="green"); self.btn_stop.configure(state="disabled", fg_color="#4a4a4a")
         self.gerer_hud()
 
@@ -361,27 +284,23 @@ class LifeRPGApp(ctk.CTk):
                     self.gerer_hud()
                     self.play_alert_sound()
                     
-                    # --- ASTUCE POUR FORCER LE PREMIER PLAN ABSOLU ---
-                    # Création d'une fenêtre de support invisible
+                    # Fenêtre invisible de support pour forcer le premier plan absolu de l'alerte de session
                     boite_forcee = tk.Toplevel()
-                    boite_forcee.withdraw()  # On cache la fenêtre principale de support
-                    boite_forcee.attributes("-topmost", True)  # On la positionne au premier plan absolu
+                    boite_forcee.withdraw()
+                    boite_forcee.attributes("-topmost", True)
                     
-                    # On affiche l'alerte attachée à ce support prioritaire
                     messagebox.showinfo(
                         "Session Terminée", 
                         f"Félicitations ! Votre session de {self.sound_limit_minutes} min est terminée.",
                         parent=boite_forcee
                     )
-                    
-                    # Nettoyage de la fenêtre de support après fermeture de l'alerte
                     boite_forcee.destroy()
                     return
             self.after(1000, self.update_timer)
 
     def play_alert_sound(self):
         try: mixer.music.load("notification.mp3"); mixer.music.play()
-        except Exception: print("Alerte sonore de fin déclenchée.")
+        except Exception: print("Alerte sonore de fin de session déclenchée.")
 
 if __name__ == "__main__":
     app = LifeRPGApp()
